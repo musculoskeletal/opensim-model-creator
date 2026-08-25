@@ -1880,19 +1880,13 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
 
     # TODO: Rotates the ankle until the toes body sits level with the ground.
     #   Uses the bone geometry rather than the markers.
-    #   Overwrites the earlier ankle_angle_r default.
+    #   Overwrites the earlier ankle_angle default.
     if left_foot_flat:
         ## left side ##
         toes_body_l = empty_model.getBodySet().get("toes_l")
-        left_foot_transform_in_ground = toes_body_l.getTransformInGround(state)
-        # Extract the rotation matrix from the transform
-        rotation_matrix = left_foot_transform_in_ground.R().asMat33()
-        # Convert the rotation matrix to Euler angles
-        rotation = osim.Rotation(rotation_matrix)
-        euler_angles = rotation.convertRotationToBodyFixedXYZ()  # Angles in radians
-
-        # assign rotation about z as a default angle
-        default_angle_l = theta_z_l + -euler_angles[2]
+        foot_axis_l = rot_to_numpy(toes_body_l.getTransformInGround(state).R())[:, 0]
+        elevation_l = np.arcsin(np.clip(foot_axis_l[1], -1.0, 1.0))
+        default_angle_l = theta_z_l - elevation_l
         left_ankle_joint = empty_model.getJointSet().get("ankle_l")
         l_ankle_flexion = left_ankle_joint.upd_coordinates(0)
         l_ankle_flexion.setDefaultValue(default_angle_l)
@@ -1900,15 +1894,9 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
     if right_foot_flat:
         ## right side ##
         toes_body_r = empty_model.getBodySet().get("toes_r")
-        right_foot_transform_in_ground = toes_body_r.getTransformInGround(state)
-        # Extract the rotation matrix from the transform
-        rotation_matrix = right_foot_transform_in_ground.R().asMat33()
-        # Convert the rotation matrix to Euler angles
-        rotation = osim.Rotation(rotation_matrix)
-        euler_angles = rotation.convertRotationToBodyFixedXYZ()  # Angles in radians
-
-        # assign rotation about z as default angle
-        default_angle_r = theta_z_r + -euler_angles[2]
+        foot_axis_r = rot_to_numpy(toes_body_r.getTransformInGround(state).R())[:, 0]
+        elevation_r = np.arcsin(np.clip(foot_axis_r[1], -1.0, 1.0))
+        default_angle_r = theta_z_r - elevation_r
         right_ankle_joint = empty_model.getJointSet().get("ankle_r")
         r_ankle_flexion = right_ankle_joint.upd_coordinates(0)
         r_ankle_flexion.setDefaultValue(default_angle_r)
