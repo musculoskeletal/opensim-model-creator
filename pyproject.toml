@@ -24,4 +24,4 @@ opensim_model_creator = ["High_Level_Inputs/**/*"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.urls]
-Repository = "https://github.com/Josh10203/opensim_model_creator"
+Repository = "https://github.com/musculoskeletal/opensim-model-creator"
