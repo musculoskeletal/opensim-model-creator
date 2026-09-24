@@ -566,7 +566,7 @@ def create_pelvis_body_and_joint(model, left_landmarks, right_landmarks, meshes,
                      offset_translation=-pelvis_origin)
 
     # Add mocap markers
-    add_markers_to_body(model, "pelvis_b", ["RASI", "LASI", "RPSI", "LPSI"], mocap_static_trc, pelvis_origin)
+    add_markers_to_body(model, "pelvis_b", ["RASI", "LASI", "RPSI", "LPSI", "SACR"], mocap_static_trc, pelvis_origin)
 
     # Add anatomical landmarks
     add_markers_to_body(model, "pelvis_b", ["ASIS", "PSIS", "SAC"], left_landmarks, pelvis_origin,
