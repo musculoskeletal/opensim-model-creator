@@ -672,9 +672,7 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
         "y": y_axis,
         "z": z_axis
     }
-    rot_l = osim.Rotation(
-        create_osim_rot_bodies(x_axis, y_axis, z_axis, body_axes['pelvis']['x'], body_axes['pelvis']['y'],
-                               body_axes['pelvis']['z'], inverse=True))
+    rot_l = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis))
     femur_r_origin, x_axis, y_axis, z_axis = model_alignment.createFemurACSISB(femur_r_center, right_landmarks['MEC'],
                                                                                right_landmarks['LEC'], side='right')
     body_axes['femur_r'] = {
@@ -682,16 +680,14 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
         "y": y_axis,
         "z": z_axis
     }
-    rot_r = osim.Rotation(
-        create_osim_rot_bodies(x_axis, y_axis, z_axis, body_axes['pelvis']['x'], body_axes['pelvis']['y'],
-                               body_axes['pelvis']['z'], inverse=True))
+    rot_r = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis))
 
     # Create the custom left hip joint with all restored parameters, femur orientation defined from x_opt
     left_hip_joint = osim.CustomJoint(
         "hip_l",  # Joint name
         pelvis,  # Parent frame (Pelvis)
         osim.Vec3(l_hjc - pelvis_centre),  # Location in parent frame
-        osim.Vec3(0, 0, 0),  # Orientation in parent frame
+        pelvis_rot.convertRotationToBodyFixedXYZ(),  # Orientation in parent frame
         left_femur,  # Child frame (Femur)
         osim.Vec3(0, 0, 0),  # Location in child frame
         rot_l.convertRotationToBodyFixedXYZ(),
@@ -725,7 +721,7 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
         "hip_r",  # Joint name
         pelvis,  # Parent frame (Pelvis)
         osim.Vec3(r_hjc - pelvis_centre),  # Location in parent frame
-        osim.Vec3(0, 0, 0),  # Orientation in parent frame
+        pelvis_rot.convertRotationToBodyFixedXYZ(),  # Orientation in parent frame
         right_femur,  # Child frame (Femur)
         osim.Vec3(0, 0, 0),  # Location in child frame
         rot_r.convertRotationToBodyFixedXYZ(),
@@ -737,9 +733,10 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
     empty_model.addJoint(left_hip_joint)
     empty_model.addJoint(right_hip_joint)
 
-    # Set hip defaults from joint offset frame.
+    # Set hip defaults from joint offset frames.
     for joint, rot, side_sign in ((left_hip_joint, rot_l, -1.0), (right_hip_joint, rot_r, 1.0)):
-        fz, fx, fy = R.from_matrix(rot_to_numpy(rot)).as_euler('ZXY')
+        net = rot_to_numpy(pelvis_rot).T @ rot_to_numpy(rot)
+        fz, fx, fy = R.from_matrix(net).as_euler('ZXY')
         joint.upd_coordinates(0).setDefaultValue(float(fz))
         joint.upd_coordinates(1).setDefaultValue(float(side_sign * fx))
         joint.upd_coordinates(2).setDefaultValue(float(side_sign * fy))
@@ -2026,26 +2023,6 @@ def create_osim_rot(x_axis, y_axis, z_axis, inverse=False):
         R = R.T  # transpose = inverse for rotation matrices
 
     # Convert to osim.Mat33
-    rot = osim.Mat33()
-    for i in range(3):
-        for j in range(3):
-            rot.set(i, j, float(R[i, j]))
-
-    return rot
-
-
-def create_osim_rot_bodies(x1, y1, z1, x2, y2, z2, inverse=False):
-    # Build coordinate system matrices
-    R1 = np.column_stack((x1, y1, z1))
-    R2 = np.column_stack((x2, y2, z2))
-
-    # Rotation from frame1 → frame2
-    R = R2 @ R1.T
-
-    if inverse:
-        R = R.T  # transpose = inverse for rotation matrices
-
-    # Convert to OpenSim Mat33
     rot = osim.Mat33()
     for i in range(3):
         for j in range(3):
