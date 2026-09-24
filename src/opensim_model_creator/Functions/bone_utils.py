@@ -1476,8 +1476,8 @@ def perform_updates(empty_model, output_folder, mesh_directory, model_name, weig
     l_hip_rotation.setDefaultClamped(True)
     l_hip_rotation.setDefaultLocked(False)
 
-    l_hip_abduction.setRangeMin(-0.8)
-    l_hip_abduction.setRangeMax(1.2)
+    l_hip_abduction.setRangeMin(-1.2)
+    l_hip_abduction.setRangeMax(0.8)
     l_hip_abduction.setDefaultClamped(True)
     l_hip_abduction.setDefaultLocked(False)
 
