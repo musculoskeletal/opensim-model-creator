@@ -1615,35 +1615,6 @@ def perform_updates(empty_model, output_folder, mesh_directory, model_name, weig
     return output_file
 
 
-# TODO: Remove. Debugging.
-def check_marker_alignment(model, mocap_static_trc):
-    """
-    Prints TRC vs model marker-error after global rigid transformation.
-    """
-    marker_names = ["LASI", "RASI", "LPSI", "RPSI", "LKNE", "RKNE",
-                    "LKNEM", "RKNEM", "LANK", "RANK", "LMED", "RMED"]
-
-    state = model.initSystem()
-    model.realizePosition(state)
-    marker_set = model.getMarkerSet()
-
-    model_points = np.array([vec3_to_numpy(marker_set.get(n).getLocationInGround(state))
-                             for n in marker_names])
-    trc_points = np.array([np.asarray(mocap_static_trc[n], dtype=float) for n in marker_names])
-
-    # Best-fit rigid transform taking the model markers onto the static trial ones
-    model_centred = model_points - model_points.mean(axis=0)
-    trc_centred = trc_points - trc_points.mean(axis=0)
-    U, _, Vt = np.linalg.svd(model_centred.T @ trc_centred)
-    d = np.sign(np.linalg.det(Vt.T @ U.T))
-    rotation = Vt.T @ np.diag([1.0, 1.0, d]) @ U.T
-
-    errors = np.linalg.norm(model_centred @ rotation.T - trc_centred, axis=1) * 1000
-    for name, error in zip(marker_names, errors):
-        print(f"MARKER {name:<6} {error:7.1f} mm")
-    print(f"MARKER {'RMS':<6} {np.sqrt(np.mean(errors ** 2)):7.1f} mm")
-
-
 def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_foot_flat=False,
                      toe_marker_proximal=False):
     """
