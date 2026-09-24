@@ -204,6 +204,7 @@ def optimize_knee_axis(model_path, trc_file, start_time, end_time, marker_weight
     bounds = [(-0.1, 0.1)] * 4
     result = minimize(objective, np.array(initial_params), method="Powell", bounds=bounds,
                       options={"disp": True, "maxiter": 3, "xtol": 0.1, "ftol": 0.01})
+    objective(result.x)
     model = osim.Model(temp_model_path_2)
     model_name_here = os.path.basename(final_output_model)
     model.setName(model_name_here)
