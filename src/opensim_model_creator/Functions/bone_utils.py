@@ -673,7 +673,10 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
         "y": y_axis,
         "z": z_axis
     }
-    rot_l = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis))
+    z_knee = np.asarray(mocap_static_trc['LKNEM']) - np.asarray(mocap_static_trc['LKNE'])
+    z_knee = z_knee - z_knee.dot(y_axis) * y_axis
+    z_knee = z_knee / np.linalg.norm(z_knee)
+    rot_l = osim.Rotation(create_osim_rot(np.cross(y_axis, z_knee), y_axis, z_knee))
     femur_r_origin, x_axis, y_axis, z_axis = model_alignment.createFemurACSISB(femur_r_center, right_landmarks['MEC'],
                                                                                right_landmarks['LEC'], side='right')
     body_axes['femur_r'] = {
@@ -681,7 +684,10 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
         "y": y_axis,
         "z": z_axis
     }
-    rot_r = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis))
+    z_knee = np.asarray(mocap_static_trc['RKNE']) - np.asarray(mocap_static_trc['RKNEM'])
+    z_knee = z_knee - z_knee.dot(y_axis) * y_axis
+    z_knee = z_knee / np.linalg.norm(z_knee)
+    rot_r = osim.Rotation(create_osim_rot(np.cross(y_axis, z_knee), y_axis, z_knee))
 
     # Create the custom left hip joint with all restored parameters, femur orientation defined from x_opt
     left_hip_joint = osim.CustomJoint(
