@@ -23,6 +23,7 @@ dist/
 package/
 *.egg-info/
 *.egg
+opensim_model_creator-*/
 
 #Mac files
 *.DS_Store
