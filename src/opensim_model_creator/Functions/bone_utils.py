@@ -435,16 +435,17 @@ def initialize_model_and_extract_landmarks(asm_directory, model_directory):
     return empty_model, state, left_landmarks, right_landmarks, x_opt_left, x_opt_right
 
 
-def create_pelvis_body_and_joint(model, left_landmarks, right_landmarks, meshes, mocap_static_trc, sex):
+def create_pelvis_body_and_joint(model, left_landmarks, right_landmarks, left_model_lms, right_model_lms, meshes, sex):
     """
     Creates the pelvis body, attaches it to the ground with a FreeJoint, and adds a mesh and markers.
 
     Parameters:
         model (osim.Model): The OpenSim model.
-        left_landmarks (dict): Dictionary of extracted left limb landmarks.
-        right_landmarks (dict): Dictionary of extracted right limb landmarks.
+        left_landmarks (dict): Left bone-surface landmark positions predicted by the shape model.
+        right_landmarks (dict): Right bone-surface landmark positions predicted by the shape model.
+        left_model_lms (dict): Left skin-surface marker positions projected from the bone-surface landmarks.
+        right_model_lms (dict): Right skin-surface marker positions projected from the bone-surface landmarks.
         meshes (str): Path to the directory containing mesh files.
-        mocap_static_trc (dict): Dictionary containing marker placements from TRC file.
 
     Returns:
         tuple:
@@ -566,7 +567,9 @@ def create_pelvis_body_and_joint(model, left_landmarks, right_landmarks, meshes,
                      offset_translation=-pelvis_origin)
 
     # Add mocap markers
-    add_markers_to_body(model, "pelvis_b", ["RASI", "LASI", "RPSI", "LPSI", "SACR"], mocap_static_trc, pelvis_origin)
+    add_markers_to_body(model, "pelvis_b", ["ASIS", "PSIS", "SAC"], left_model_lms, pelvis_origin,
+                        ["LASI", "LPSI", "SACR"])
+    add_markers_to_body(model, "pelvis_b", ["ASIS", "PSIS"], right_model_lms, pelvis_origin, ["RASI", "RPSI"])
 
     # Add anatomical landmarks
     add_markers_to_body(model, "pelvis_b", ["ASIS", "PSIS", "SAC"], left_landmarks, pelvis_origin,
@@ -577,15 +580,17 @@ def create_pelvis_body_and_joint(model, left_landmarks, right_landmarks, meshes,
     return pelvis, pelvis_origin, pelvis_length, lumbar_joint_centre, body_axes, pelvis_rotation_osim
 
 
-def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landmarks, meshes, mocap_static_trc, pelvis,
-                                       pelvis_centre, body_axes, pelvis_rot):
+def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landmarks, left_model_lms, right_model_lms,
+                                       meshes, mocap_static_trc, pelvis, pelvis_centre, body_axes, pelvis_rot):
     """
     Creates the left and right femur bodies and attaches custom hip joints to the OpenSim model.
 
     Args:
         empty_model (osim.Model): The OpenSim model to which femur bodies and hip joints will be added.
-        left_landmarks (dict): Dictionary containing the anatomical landmarks for the left side.
-        right_landmarks (dict): Dictionary containing the anatomical landmarks for the right side.
+        left_landmarks (dict): Left bone-surface landmark positions predicted by the shape model.
+        right_landmarks (dict): Right bone-surface landmark positions predicted by the shape model.
+        left_model_lms (dict): Left skin-surface marker positions projected from the bone-surface landmarks.
+        right_model_lms (dict): Right skin-surface marker positions projected from the bone-surface landmarks.
         meshes (str): Directory containing the mesh files for the left and right femurs.
         mocap_static_trc (dict): Motion capture static marker data used to position markers.
         pelvis (osim.Body): The pelvis body in the OpenSim model.
@@ -635,8 +640,10 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
                      offset_translation=-femur_l_center)
 
     # Add mocap markers to the femur bodies, taken from static trial for tracking markers
-    add_markers_to_body(empty_model, "femur_l", ["LTHI", "LKNE", "LKNEM"], mocap_static_trc, femur_l_center)
-    add_markers_to_body(empty_model, "femur_r", ["RTHI", "RKNE", "RKNEM"], mocap_static_trc, femur_r_center)
+    add_markers_to_body(empty_model, "femur_l", ["LTHI"], mocap_static_trc, femur_l_center)
+    add_markers_to_body(empty_model, "femur_r", ["RTHI"], mocap_static_trc, femur_r_center)
+    add_markers_to_body(empty_model, "femur_l", ["LEC", "MEC"], left_model_lms, femur_l_center, ["LKNE", "LKNEM"])
+    add_markers_to_body(empty_model, "femur_r", ["LEC", "MEC"], right_model_lms, femur_r_center, ["RKNE", "RKNEM"])
 
     # Add anatomical landmarks to the femur bodies with custom marker names, taken from shape model prediction for anatomical markers
     add_markers_to_body(empty_model, "femur_l", ["LEC", "MEC"], left_landmarks, femur_l_center,
@@ -752,15 +759,17 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
 
 
 def create_tibfib_bodies_and_knee_joints(
-        empty_model, left_landmarks, right_landmarks, meshes, mocap_static_trc,
+        empty_model, left_landmarks, right_landmarks, left_model_lms, right_model_lms, meshes, mocap_static_trc,
         left_femur, right_femur, femur_l_center, femur_r_center, body_axes):
     """
     Creates tibia and fibula (tibfib) bodies and defines the knee joints within an OpenSim model.
 
     Args:
         empty_model (osim.Model): The OpenSim model to which the tibfib bodies and knee joints will be added.
-        left_landmarks (dict): Landmark coordinates for the left side.
-        right_landmarks (dict): Landmark coordinates for the right side.
+        left_landmarks (dict): Left bone-surface landmark positions predicted by the shape model.
+        right_landmarks (dict): Right bone-surface landmark positions predicted by the shape model.
+        left_model_lms (dict): Left skin-surface marker positions projected from the bone-surface landmarks.
+        right_model_lms (dict): Right skin-surface marker positions projected from the bone-surface landmarks.
         meshes (str): Path to the folder containing mesh files.
         mocap_static_trc (dict): Motion capture data for static trials.
         left_femur (osim.Body): The left femur body in the model.
@@ -868,16 +877,18 @@ def create_tibfib_bodies_and_knee_joints(
     #   The final model pose does not even remotely match the static input in some cases.
     # Add mocap markers to the tibfib bodies
     # Add mocap markers for the left tibfib body
-    add_markers_to_body(empty_model, "tibfib_l", ["LTIB", "LTOE", "LHEE", "LMED", "LANK"], mocap_static_trc,
-                        tibia_l_center)
+    add_markers_to_body(empty_model, "tibfib_l", ["LTIB", "LTOE", "LHEE"], mocap_static_trc, tibia_l_center)
+    add_markers_to_body(empty_model, "tibfib_l", ["malleolus_med", "malleolus_lat"], left_model_lms, tibia_l_center,
+                        ["LMED", "LANK"])
 
     # Add landmark markers for the left tibfib body
     add_markers_to_body(empty_model, "tibfib_l", ["malleolus_med", "malleolus_lat"], left_landmarks, tibia_l_center,
                         ["LMED_ssm", "LANK_ssm"])
 
     # Add mocap markers for the right tibfib body
-    add_markers_to_body(empty_model, "tibfib_r", ["RTIB", "RTOE", "RHEE", "RMED", "RANK"], mocap_static_trc,
-                        tibia_r_center)
+    add_markers_to_body(empty_model, "tibfib_r", ["RTIB", "RTOE", "RHEE"], mocap_static_trc, tibia_r_center)
+    add_markers_to_body(empty_model, "tibfib_r", ["malleolus_med", "malleolus_lat"], right_model_lms, tibia_r_center,
+                        ["RMED", "RANK"])
 
     # Add landmark markers for the right tibfib body
     add_markers_to_body(empty_model, "tibfib_r", ["malleolus_med", "malleolus_lat"], right_landmarks, tibia_r_center,

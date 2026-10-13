@@ -88,7 +88,8 @@ def create_model(static_trc, dynamic_trc, output_directory, static_marker_data, 
     empty_model.printToXML(output_file)
 
     landmark_files = ["original_lms_left.txt", "original_lms_right.txt",
-                      "predicted_lms_left.txt", "predicted_lms_right.txt"]
+                      "predicted_lms_left.txt", "predicted_lms_right.txt",
+                      "model_lms_left.txt", "model_lms_right.txt"]
     scale_landmark_files(mesh_directory, landmark_files)
 
     #remove the scaled foot model from directory
@@ -105,15 +106,20 @@ def create_model(static_trc, dynamic_trc, output_directory, static_marker_data, 
 
 def create_model_bodies(mesh_directory, static_marker_data, empty_model, left_lms, right_lms, x_opt_left, x_opt_right, sex):
 
+    # Skin-surface marker positions projected outwards from the bone-surface landmarks.
+    left_model_lms = load_landmarks(os.path.join(mesh_directory, "model_lms_left.txt"))
+    right_model_lms = load_landmarks(os.path.join(mesh_directory, "model_lms_right.txt"))
+
     pelvis, pelvis_centre, pelvis_length, lumbar_joint_centre, body_axes, pelvis_rot = create_pelvis_body_and_joint(
-        empty_model, left_lms, right_lms, mesh_directory, static_marker_data, sex)
+        empty_model, left_lms, right_lms, left_model_lms, right_model_lms, mesh_directory, sex)
 
     left_femur, femur_l_centre, right_femur, femur_r_centre, l_femur_length, r_femur_length, body_axes = create_femur_bodies_and_hip_joints(
-        empty_model, left_lms, right_lms, mesh_directory, static_marker_data, pelvis, pelvis_centre, body_axes, pelvis_rot)
+        empty_model, left_lms, right_lms, left_model_lms, right_model_lms, mesh_directory, static_marker_data, pelvis,
+        pelvis_centre, body_axes, pelvis_rot)
 
     tibfib_l_centre, tibfib_r_centre, left_tibfib, right_tibfib, l_tibfib_length, r_tibfib_length, l_EC_midpoint, r_EC_midpoint = create_tibfib_bodies_and_knee_joints(
-        empty_model, left_lms, right_lms, mesh_directory, static_marker_data, left_femur, right_femur, femur_l_centre,
-        femur_r_centre, body_axes)
+        empty_model, left_lms, right_lms, left_model_lms, right_model_lms, mesh_directory, static_marker_data,
+        left_femur, right_femur, femur_l_centre, femur_r_centre, body_axes)
 
     repurpose_feet_bodies_and_create_joints(empty_model, left_tibfib, right_tibfib, body_axes)
 
