@@ -1771,7 +1771,7 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
     child_frame_rotation_new = (talus_rotation.T @ R_residual.as_matrix().T @ talus_rotation @ child_frame_rotation)
     new_orient = osim.Vec3(*R.from_matrix(child_frame_rotation_new).as_euler('XYZ'))
 
-    child_frame.set_orientation(new_orient)
+    # child_frame.set_orientation(new_orient)
     # FINALIZE
     state = empty_model.initSystem()
 
@@ -1859,7 +1859,7 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
     child_frame_rotation_new = (talus_rotation.T @ R_residual.as_matrix().T @ talus_rotation @ child_frame_rotation)
     new_orient = osim.Vec3(*R.from_matrix(child_frame_rotation_new).as_euler('XYZ'))
 
-    child_frame.set_orientation(new_orient)
+    # child_frame.set_orientation(new_orient)
     # FINALIZE
     state = empty_model.initSystem()
 
