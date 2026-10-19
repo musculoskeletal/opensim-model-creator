@@ -1889,22 +1889,14 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
         r_ankle_flexion = right_ankle_joint.upd_coordinates(0)
         r_ankle_flexion.setDefaultValue(default_angle_r)
 
-    # set model markers from static trial
-    marker_set = empty_model.getMarkerSet()
-    marker_set.get("RTOE").setName("RTOE_model")
-    marker_set.get("RHEE").setName("RHEE_model")
-    marker_set.get("LTOE").setName("LTOE_model")
-    marker_set.get("LHEE").setName("LHEE_model")
-
-    move_marker_to_body(empty_model, state, "RTOE_0", "toes_r")
-    move_marker_to_body(empty_model, state, "RHEE_0", "calcn_r")
-    move_marker_to_body(empty_model, state, "LTOE_0", "toes_l")
-    move_marker_to_body(empty_model, state, "LHEE_0", "calcn_l")
-
-    marker_set.get("RTOE_0").setName("RTOE")
-    marker_set.get("RHEE_0").setName("RHEE")
-    marker_set.get("LTOE_0").setName("LTOE")
-    marker_set.get("LHEE_0").setName("LHEE")
+    # Use the foot model's own markers as the TOE and HEE markers, removing the static trial markers.
+    marker_set = empty_model.updMarkerSet()
+    for side in "RL":
+        marker_set.remove(marker_set.getIndex(f"{side}TOE_0"))
+        marker_set.remove(marker_set.getIndex(f"{side}HEE_0"))
+        if toe_marker_proximal:
+            marker_set.remove(marker_set.getIndex(f"{side}TOE"))
+            marker_set.get(f"{side}TOE_osim").setName(f"{side}TOE")
 
 
 def perform_scaling(output_directory, output_file, static_trc_file):
@@ -1969,41 +1961,6 @@ def numpy_to_vec3(a):
 
 def rot_to_numpy(R):
     return np.array([[R.get(i, j) for j in range(3)] for i in range(3)])
-
-
-def move_marker_to_body(model, state, marker_name, new_body_name):
-    state = model.initSystem()
-    model.realizePosition(state)
-
-    marker = model.getMarkerSet().get(marker_name)
-
-    old_body = marker.getParentFrame()
-    new_body = model.getBodySet().get(new_body_name)
-
-    # marker location in old body frame
-    p_old = vec3_to_numpy(marker.get_location())
-
-    # transforms
-    T_old = old_body.getTransformInGround(state)
-    T_new = new_body.getTransformInGround(state)
-
-    R_old = rot_to_numpy(T_old.R())
-    p_old_body = vec3_to_numpy(T_old.p())
-
-    R_new = rot_to_numpy(T_new.R())
-    p_new_body = vec3_to_numpy(T_new.p())
-
-    # old body → ground
-    p_ground = R_old @ p_old + p_old_body
-
-    # ground → new body
-    p_new = R_new.T @ (p_ground - p_new_body)
-
-    # update marker
-    marker.setParentFrame(new_body)
-    marker.set_location(numpy_to_vec3(p_new))
-
-    return p_new
 
 
 def create_osim_rot(x_axis, y_axis, z_axis, inverse=False):
