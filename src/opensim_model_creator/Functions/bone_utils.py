@@ -1574,6 +1574,10 @@ def perform_updates(empty_model, output_folder, mesh_directory, model_name, weig
     l_ankle_flexion.setDefaultClamped(True)
     l_ankle_flexion.setDefaultLocked(False)
 
+    # Lock the subtalar and toe joints.
+    for coordinate_name in ("subtalar_angle_l", "subtalar_angle_r", "mtp_angle_l", "mtp_angle_r"):
+        model.updCoordinateSet().get(coordinate_name).setDefaultLocked(True)
+
     # Locate body segments based on printed names
     pelvis = model.getBodySet().get('pelvis_b')
     femur_l = model.getBodySet().get('femur_l')
