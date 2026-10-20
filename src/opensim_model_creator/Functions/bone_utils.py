@@ -1782,57 +1782,6 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
     # Reinitialize so marker locations update
     state = empty_model.initSystem()
 
-    # TODO: Pass 2 adjusts the internal-external rotation and inversion/eversion.
-    #   It re-calculates the model vector and the full 3D rotation required.
-    #   This is applied by tilting how the joint is mounted, not by rotating the ankle.
-    # RECOMPUTE FOOT VECTOR AFTER FLEXION
-
-    toe_ground = vec3_to_numpy(toe_marker.getLocationInGround(state))
-    heel_ground = vec3_to_numpy(heel_marker.getLocationInGround(state))
-
-    model_vec = toe_ground - heel_ground
-    model_vec /= np.linalg.norm(model_vec)
-
-    # Rotation aligning updated model vector to mocap vector
-    cross = np.cross(model_vec, mocap_vec)
-    dot = np.dot(model_vec, mocap_vec)
-
-    cross_norm = np.linalg.norm(cross)
-
-    if cross_norm < 1e-8:
-
-        # vectors already aligned
-        R_residual = R.identity()
-
-    else:
-
-        # Right-hand-rule axis
-        axis = cross / cross_norm
-
-        # Signed angle between vectors
-        angle = np.arctan2(cross_norm, dot)
-
-        # Rotation taking:
-        # model_vec -> mocap_vec
-        R_residual = R.from_rotvec(axis * angle)
-
-    # APPLY TO CHILD FRAME
-
-    child_frame = left_ankle_joint.upd_frames(1)
-
-    orient = child_frame.get_orientation()
-
-    # Compose residual rotation in talus coordinates.
-    talus_body_l = empty_model.getBodySet().get("talus_l")
-    talus_rotation = rot_to_numpy(talus_body_l.getTransformInGround(state).R())
-    child_frame_rotation = R.from_euler('XYZ', [orient.get(0), orient.get(1), orient.get(2)]).as_matrix()
-    child_frame_rotation_new = (talus_rotation.T @ R_residual.as_matrix().T @ talus_rotation @ child_frame_rotation)
-    new_orient = osim.Vec3(*R.from_matrix(child_frame_rotation_new).as_euler('XYZ'))
-
-    # child_frame.set_orientation(new_orient)
-    # FINALIZE
-    state = empty_model.initSystem()
-
     # === Adjust Orientation of the Right Foot ===
 
     # --- Get marker positions in GROUND ---
@@ -1871,54 +1820,6 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
     r_ankle_flexion.setDefaultValue(theta_z_r)
 
     # Reinitialize so marker locations update
-    state = empty_model.initSystem()
-
-    # RECOMPUTE FOOT VECTOR AFTER FLEXION
-
-    toe_ground = vec3_to_numpy(toe_marker.getLocationInGround(state))
-    heel_ground = vec3_to_numpy(heel_marker.getLocationInGround(state))
-
-    model_vec = toe_ground - heel_ground
-    model_vec /= np.linalg.norm(model_vec)
-
-    # Rotation aligning updated model vector to mocap vector
-    cross = np.cross(model_vec, mocap_vec)
-    dot = np.dot(model_vec, mocap_vec)
-
-    cross_norm = np.linalg.norm(cross)
-
-    if cross_norm < 1e-8:
-
-        # vectors already aligned
-        R_residual = R.identity()
-
-    else:
-
-        # Right-hand-rule axis
-        axis = cross / cross_norm
-
-        # Signed angle between vectors
-        angle = np.arctan2(cross_norm, dot)
-
-        # Rotation taking:
-        # model_vec -> mocap_vec
-        R_residual = R.from_rotvec(axis * angle)
-
-    # APPLY TO CHILD FRAME
-
-    child_frame = right_ankle_joint.upd_frames(1)
-
-    orient = child_frame.get_orientation()
-
-    # Compose residual rotation in talus coordinates.
-    talus_body_r = empty_model.getBodySet().get("talus_r")
-    talus_rotation = rot_to_numpy(talus_body_r.getTransformInGround(state).R())
-    child_frame_rotation = R.from_euler('XYZ', [orient.get(0), orient.get(1), orient.get(2)]).as_matrix()
-    child_frame_rotation_new = (talus_rotation.T @ R_residual.as_matrix().T @ talus_rotation @ child_frame_rotation)
-    new_orient = osim.Vec3(*R.from_matrix(child_frame_rotation_new).as_euler('XYZ'))
-
-    # child_frame.set_orientation(new_orient)
-    # FINALIZE
     state = empty_model.initSystem()
 
 
