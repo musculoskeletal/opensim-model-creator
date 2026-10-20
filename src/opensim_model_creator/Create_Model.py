@@ -84,6 +84,8 @@ def create_model(static_trc, dynamic_trc, output_directory, static_marker_data, 
 
     feet_adjustments(empty_model, static_marker_data, left_foot_flat=left_foot_flat,
                      right_foot_flat=right_foot_flat, toe_marker_proximal=toe_marker_proximal)
+    add_tracking_markers_to_bodies(empty_model, {"femur_l": ["LTHI"], "femur_r": ["RTHI"],
+                                                 "tibfib_l": ["LTIB"], "tibfib_r": ["RTIB"]}, static_marker_data)
     empty_model.finalizeConnections()
     empty_model.printToXML(output_file)
 

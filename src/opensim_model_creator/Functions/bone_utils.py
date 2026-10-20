@@ -156,6 +156,28 @@ def add_markers_to_body(model, body_name, marker_names, mocap_file, center, cust
         print(f"Error adding markers to body '{body_name}': {e}")
 
 
+def add_tracking_markers_to_bodies(model, markers_per_body, mocap_static_trc):
+    """
+    Adds static trial markers to the model bodies, at their static trial positions in the model's default pose.
+    """
+    state = model.initSystem()
+    markers = []
+    for body_name, marker_names in markers_per_body.items():
+        body = model.getBodySet().get(body_name)
+        transform = body.getTransformInGround(state)
+        rotation = rot_to_numpy(transform.R())
+        origin = vec3_to_numpy(transform.p())
+        for marker_name in marker_names:
+            if marker_name not in mocap_static_trc:
+                print(f"Marker '{marker_name}' not found in mocap file. Skipping.")
+                continue
+            location = rotation.T @ (np.asarray(mocap_static_trc[marker_name]) - origin)
+            markers.append(osim.Marker(marker_name, body, numpy_to_vec3(location)))
+
+    for marker in markers:
+        model.addMarker(marker)
+
+
 def optimize_knee_axis(model_path, trc_file, start_time, end_time, marker_weights, initial_params, temp_model_path_1,
                        temp_model_path_2, final_output_model):
     """
@@ -639,9 +661,7 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
     add_mesh_to_body(empty_model, "femur_l", relative_path, offset_orientation=(0, 0, 0),
                      offset_translation=-femur_l_center)
 
-    # Add mocap markers to the femur bodies, taken from static trial for tracking markers
-    add_markers_to_body(empty_model, "femur_l", ["LTHI"], mocap_static_trc, femur_l_center)
-    add_markers_to_body(empty_model, "femur_r", ["RTHI"], mocap_static_trc, femur_r_center)
+    # Add mocap markers to the femur bodies
     add_markers_to_body(empty_model, "femur_l", ["LEC", "MEC"], left_model_lms, femur_l_center, ["LKNE", "LKNEM"])
     add_markers_to_body(empty_model, "femur_r", ["LEC", "MEC"], right_model_lms, femur_r_center, ["RKNE", "RKNEM"])
 
@@ -879,7 +899,7 @@ def create_tibfib_bodies_and_knee_joints(
     #   The final model pose does not even remotely match the static input in some cases.
     # Add mocap markers to the tibfib bodies
     # Add mocap markers for the left tibfib body
-    add_markers_to_body(empty_model, "tibfib_l", ["LTIB", "LTOE", "LHEE"], mocap_static_trc, tibia_l_center)
+    add_markers_to_body(empty_model, "tibfib_l", ["LTOE", "LHEE"], mocap_static_trc, tibia_l_center)
     add_markers_to_body(empty_model, "tibfib_l", ["malleolus_med", "malleolus_lat"], left_model_lms, tibia_l_center,
                         ["LMED", "LANK"])
 
@@ -888,7 +908,7 @@ def create_tibfib_bodies_and_knee_joints(
                         ["LMED_ssm", "LANK_ssm"])
 
     # Add mocap markers for the right tibfib body
-    add_markers_to_body(empty_model, "tibfib_r", ["RTIB", "RTOE", "RHEE"], mocap_static_trc, tibia_r_center)
+    add_markers_to_body(empty_model, "tibfib_r", ["RTOE", "RHEE"], mocap_static_trc, tibia_r_center)
     add_markers_to_body(empty_model, "tibfib_r", ["malleolus_med", "malleolus_lat"], right_model_lms, tibia_r_center,
                         ["RMED", "RANK"])
 
