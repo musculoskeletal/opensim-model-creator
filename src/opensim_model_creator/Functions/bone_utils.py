@@ -156,6 +156,48 @@ def add_markers_to_body(model, body_name, marker_names, mocap_file, center, cust
         print(f"Error adding markers to body '{body_name}': {e}")
 
 
+def add_tracking_markers_to_bodies(model, markers_per_body, mocap_static_trc):
+    """
+    Adds static trial markers to the model bodies, at their static trial positions in the model's default pose.
+    """
+    state = model.initSystem()
+    markers = []
+    for body_name, marker_names in markers_per_body.items():
+        body = model.getBodySet().get(body_name)
+        transform = body.getTransformInGround(state)
+        rotation = rot_to_numpy(transform.R())
+        origin = vec3_to_numpy(transform.p())
+        for marker_name in marker_names:
+            if marker_name not in mocap_static_trc:
+                print(f"Marker '{marker_name}' not found in mocap file. Skipping.")
+                continue
+            location = rotation.T @ (np.asarray(mocap_static_trc[marker_name]) - origin)
+            markers.append(osim.Marker(marker_name, body, numpy_to_vec3(location)))
+
+    for marker in markers:
+        model.addMarker(marker)
+
+
+def align_marker_pair(landmarks, names, mocap_static_trc, mocap_names, long_axis):
+    """
+    Turns a pair of landmarks about the segment's long axis, through their midpoint, so the line between them points
+    the same way as the line between the matching pair of static trial markers.
+    """
+    axis = long_axis / np.linalg.norm(long_axis)
+
+    def flatten(v):
+        v = v - v.dot(axis) * axis
+        return v / np.linalg.norm(v)
+
+    first, second = (np.asarray(landmarks[name]) for name in names)
+    current = flatten(second - first)
+    target = flatten(np.asarray(mocap_static_trc[mocap_names[1]]) - np.asarray(mocap_static_trc[mocap_names[0]]))
+    rotation = R.from_rotvec(axis * np.arctan2(np.cross(current, target).dot(axis), current.dot(target)))
+    midpoint = (first + second) / 2
+
+    return {names[0]: midpoint + rotation.apply(first - midpoint), names[1]: midpoint + rotation.apply(second - midpoint)}
+
+
 def optimize_knee_axis(model_path, trc_file, start_time, end_time, marker_weights, initial_params, temp_model_path_1,
                        temp_model_path_2, final_output_model):
     """
@@ -639,11 +681,11 @@ def create_femur_bodies_and_hip_joints(empty_model, left_landmarks, right_landma
     add_mesh_to_body(empty_model, "femur_l", relative_path, offset_orientation=(0, 0, 0),
                      offset_translation=-femur_l_center)
 
-    # Add mocap markers to the femur bodies, taken from static trial for tracking markers
-    add_markers_to_body(empty_model, "femur_l", ["LTHI"], mocap_static_trc, femur_l_center)
-    add_markers_to_body(empty_model, "femur_r", ["RTHI"], mocap_static_trc, femur_r_center)
-    add_markers_to_body(empty_model, "femur_l", ["LEC", "MEC"], left_model_lms, femur_l_center, ["LKNE", "LKNEM"])
-    add_markers_to_body(empty_model, "femur_r", ["LEC", "MEC"], right_model_lms, femur_r_center, ["RKNE", "RKNEM"])
+    # Add mocap markers to the femur bodies
+    l_knee_lms = align_marker_pair(left_model_lms, ["LEC", "MEC"], mocap_static_trc, ["LKNE", "LKNEM"], l_hjc - l_ecc)
+    r_knee_lms = align_marker_pair(right_model_lms, ["LEC", "MEC"], mocap_static_trc, ["RKNE", "RKNEM"], r_hjc - r_ecc)
+    add_markers_to_body(empty_model, "femur_l", ["LEC", "MEC"], l_knee_lms, femur_l_center, ["LKNE", "LKNEM"])
+    add_markers_to_body(empty_model, "femur_r", ["LEC", "MEC"], r_knee_lms, femur_r_center, ["RKNE", "RKNEM"])
 
     # Add anatomical landmarks to the femur bodies with custom marker names, taken from shape model prediction for anatomical markers
     add_markers_to_body(empty_model, "femur_l", ["LEC", "MEC"], left_landmarks, femur_l_center,
@@ -839,6 +881,10 @@ def create_tibfib_bodies_and_knee_joints(
         "y": y_axis,
         "z": z_axis
     }
+    z_ankle = np.asarray(mocap_static_trc['LMED']) - np.asarray(mocap_static_trc['LANK'])
+    z_ankle = z_ankle - z_ankle.dot(y_axis) * y_axis
+    z_ankle = z_ankle / np.linalg.norm(z_ankle)
+    body_axes['ankle_l'] = {"x": np.cross(y_axis, z_ankle), "y": y_axis, "z": z_ankle}
     rot_fem_l = osim.Rotation(
         create_osim_rot(body_axes['femur_l']['x'], body_axes['femur_l']['y'], body_axes['femur_l']['z'], inverse=False))
     rot_l = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis, inverse=False))
@@ -851,6 +897,10 @@ def create_tibfib_bodies_and_knee_joints(
         "y": y_axis,
         "z": z_axis
     }
+    z_ankle = np.asarray(mocap_static_trc['RANK']) - np.asarray(mocap_static_trc['RMED'])
+    z_ankle = z_ankle - z_ankle.dot(y_axis) * y_axis
+    z_ankle = z_ankle / np.linalg.norm(z_ankle)
+    body_axes['ankle_r'] = {"x": np.cross(y_axis, z_ankle), "y": y_axis, "z": z_ankle}
     rot_fem_r = osim.Rotation(
         create_osim_rot(body_axes['femur_r']['x'], body_axes['femur_r']['y'], body_axes['femur_r']['z'], inverse=False))
     rot_r = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis, inverse=False))
@@ -877,8 +927,10 @@ def create_tibfib_bodies_and_knee_joints(
     #   The final model pose does not even remotely match the static input in some cases.
     # Add mocap markers to the tibfib bodies
     # Add mocap markers for the left tibfib body
-    add_markers_to_body(empty_model, "tibfib_l", ["LTIB", "LTOE", "LHEE"], mocap_static_trc, tibia_l_center)
-    add_markers_to_body(empty_model, "tibfib_l", ["malleolus_med", "malleolus_lat"], left_model_lms, tibia_l_center,
+    add_markers_to_body(empty_model, "tibfib_l", ["LTOE", "LHEE"], mocap_static_trc, tibia_l_center)
+    l_ankle_lms = align_marker_pair(left_model_lms, ["malleolus_lat", "malleolus_med"], mocap_static_trc,
+                                    ["LANK", "LMED"], body_axes['tibfib_l']['y'])
+    add_markers_to_body(empty_model, "tibfib_l", ["malleolus_med", "malleolus_lat"], l_ankle_lms, tibia_l_center,
                         ["LMED", "LANK"])
 
     # Add landmark markers for the left tibfib body
@@ -886,8 +938,10 @@ def create_tibfib_bodies_and_knee_joints(
                         ["LMED_ssm", "LANK_ssm"])
 
     # Add mocap markers for the right tibfib body
-    add_markers_to_body(empty_model, "tibfib_r", ["RTIB", "RTOE", "RHEE"], mocap_static_trc, tibia_r_center)
-    add_markers_to_body(empty_model, "tibfib_r", ["malleolus_med", "malleolus_lat"], right_model_lms, tibia_r_center,
+    add_markers_to_body(empty_model, "tibfib_r", ["RTOE", "RHEE"], mocap_static_trc, tibia_r_center)
+    r_ankle_lms = align_marker_pair(right_model_lms, ["malleolus_lat", "malleolus_med"], mocap_static_trc,
+                                    ["RANK", "RMED"], body_axes['tibfib_r']['y'])
+    add_markers_to_body(empty_model, "tibfib_r", ["malleolus_med", "malleolus_lat"], r_ankle_lms, tibia_r_center,
                         ["RMED", "RANK"])
 
     # Add landmark markers for the right tibfib body
@@ -1116,11 +1170,11 @@ def repurpose_feet_bodies_and_create_joints(empty_model, left_tibfib, right_tibf
         print(f"Joint '{joint_name_to_remove}' not found in the model.")
 
     rot_tib_l = osim.Rotation(
-        create_osim_rot(body_axes['tibfib_l']['x'], body_axes['tibfib_l']['y'], body_axes['tibfib_l']['z'],
+        create_osim_rot(body_axes['ankle_l']['x'], body_axes['ankle_l']['y'], body_axes['ankle_l']['z'],
                         inverse=False))
 
     rot_tib_r = osim.Rotation(
-        create_osim_rot(body_axes['tibfib_r']['x'], body_axes['tibfib_r']['y'], body_axes['tibfib_r']['z'],
+        create_osim_rot(body_axes['ankle_r']['x'], body_axes['ankle_r']['y'], body_axes['ankle_r']['z'],
                         inverse=False))
 
     # Define the ankle joint connecting the left talus to the left tibfib
@@ -1572,6 +1626,10 @@ def perform_updates(empty_model, output_folder, mesh_directory, model_name, weig
     l_ankle_flexion.setDefaultClamped(True)
     l_ankle_flexion.setDefaultLocked(False)
 
+    # Lock the toe joints.
+    for coordinate_name in ("mtp_angle_l", "mtp_angle_r"):
+        model.updCoordinateSet().get(coordinate_name).setDefaultLocked(True)
+
     # Locate body segments based on printed names
     pelvis = model.getBodySet().get('pelvis_b')
     femur_l = model.getBodySet().get('femur_l')
@@ -1724,57 +1782,6 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
     # Reinitialize so marker locations update
     state = empty_model.initSystem()
 
-    # TODO: Pass 2 adjusts the internal-external rotation and inversion/eversion.
-    #   It re-calculates the model vector and the full 3D rotation required.
-    #   This is applied by tilting how the joint is mounted, not by rotating the ankle.
-    # RECOMPUTE FOOT VECTOR AFTER FLEXION
-
-    toe_ground = vec3_to_numpy(toe_marker.getLocationInGround(state))
-    heel_ground = vec3_to_numpy(heel_marker.getLocationInGround(state))
-
-    model_vec = toe_ground - heel_ground
-    model_vec /= np.linalg.norm(model_vec)
-
-    # Rotation aligning updated model vector to mocap vector
-    cross = np.cross(model_vec, mocap_vec)
-    dot = np.dot(model_vec, mocap_vec)
-
-    cross_norm = np.linalg.norm(cross)
-
-    if cross_norm < 1e-8:
-
-        # vectors already aligned
-        R_residual = R.identity()
-
-    else:
-
-        # Right-hand-rule axis
-        axis = cross / cross_norm
-
-        # Signed angle between vectors
-        angle = np.arctan2(cross_norm, dot)
-
-        # Rotation taking:
-        # model_vec -> mocap_vec
-        R_residual = R.from_rotvec(axis * angle)
-
-    # APPLY TO CHILD FRAME
-
-    child_frame = left_ankle_joint.upd_frames(1)
-
-    orient = child_frame.get_orientation()
-
-    # Compose residual rotation in talus coordinates.
-    talus_body_l = empty_model.getBodySet().get("talus_l")
-    talus_rotation = rot_to_numpy(talus_body_l.getTransformInGround(state).R())
-    child_frame_rotation = R.from_euler('XYZ', [orient.get(0), orient.get(1), orient.get(2)]).as_matrix()
-    child_frame_rotation_new = (talus_rotation.T @ R_residual.as_matrix().T @ talus_rotation @ child_frame_rotation)
-    new_orient = osim.Vec3(*R.from_matrix(child_frame_rotation_new).as_euler('XYZ'))
-
-    child_frame.set_orientation(new_orient)
-    # FINALIZE
-    state = empty_model.initSystem()
-
     # === Adjust Orientation of the Right Foot ===
 
     # --- Get marker positions in GROUND ---
@@ -1813,54 +1820,6 @@ def feet_adjustments(empty_model, mocap_static_trc, left_foot_flat=False, right_
     r_ankle_flexion.setDefaultValue(theta_z_r)
 
     # Reinitialize so marker locations update
-    state = empty_model.initSystem()
-
-    # RECOMPUTE FOOT VECTOR AFTER FLEXION
-
-    toe_ground = vec3_to_numpy(toe_marker.getLocationInGround(state))
-    heel_ground = vec3_to_numpy(heel_marker.getLocationInGround(state))
-
-    model_vec = toe_ground - heel_ground
-    model_vec /= np.linalg.norm(model_vec)
-
-    # Rotation aligning updated model vector to mocap vector
-    cross = np.cross(model_vec, mocap_vec)
-    dot = np.dot(model_vec, mocap_vec)
-
-    cross_norm = np.linalg.norm(cross)
-
-    if cross_norm < 1e-8:
-
-        # vectors already aligned
-        R_residual = R.identity()
-
-    else:
-
-        # Right-hand-rule axis
-        axis = cross / cross_norm
-
-        # Signed angle between vectors
-        angle = np.arctan2(cross_norm, dot)
-
-        # Rotation taking:
-        # model_vec -> mocap_vec
-        R_residual = R.from_rotvec(axis * angle)
-
-    # APPLY TO CHILD FRAME
-
-    child_frame = right_ankle_joint.upd_frames(1)
-
-    orient = child_frame.get_orientation()
-
-    # Compose residual rotation in talus coordinates.
-    talus_body_r = empty_model.getBodySet().get("talus_r")
-    talus_rotation = rot_to_numpy(talus_body_r.getTransformInGround(state).R())
-    child_frame_rotation = R.from_euler('XYZ', [orient.get(0), orient.get(1), orient.get(2)]).as_matrix()
-    child_frame_rotation_new = (talus_rotation.T @ R_residual.as_matrix().T @ talus_rotation @ child_frame_rotation)
-    new_orient = osim.Vec3(*R.from_matrix(child_frame_rotation_new).as_euler('XYZ'))
-
-    child_frame.set_orientation(new_orient)
-    # FINALIZE
     state = empty_model.initSystem()
 
 
