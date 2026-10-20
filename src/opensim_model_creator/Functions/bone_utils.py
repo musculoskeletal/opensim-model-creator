@@ -861,7 +861,7 @@ def create_tibfib_bodies_and_knee_joints(
         "y": y_axis,
         "z": z_axis
     }
-    z_ankle = l_MMAL - l_LMAL
+    z_ankle = np.asarray(mocap_static_trc['LMED']) - np.asarray(mocap_static_trc['LANK'])
     z_ankle = z_ankle - z_ankle.dot(y_axis) * y_axis
     z_ankle = z_ankle / np.linalg.norm(z_ankle)
     body_axes['ankle_l'] = {"x": np.cross(y_axis, z_ankle), "y": y_axis, "z": z_ankle}
@@ -877,7 +877,7 @@ def create_tibfib_bodies_and_knee_joints(
         "y": y_axis,
         "z": z_axis
     }
-    z_ankle = r_LMAL - r_MMAL
+    z_ankle = np.asarray(mocap_static_trc['RANK']) - np.asarray(mocap_static_trc['RMED'])
     z_ankle = z_ankle - z_ankle.dot(y_axis) * y_axis
     z_ankle = z_ankle / np.linalg.norm(z_ankle)
     body_axes['ankle_r'] = {"x": np.cross(y_axis, z_ankle), "y": y_axis, "z": z_ankle}
