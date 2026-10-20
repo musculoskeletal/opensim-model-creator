@@ -861,6 +861,10 @@ def create_tibfib_bodies_and_knee_joints(
         "y": y_axis,
         "z": z_axis
     }
+    z_ankle = l_MMAL - l_LMAL
+    z_ankle = z_ankle - z_ankle.dot(y_axis) * y_axis
+    z_ankle = z_ankle / np.linalg.norm(z_ankle)
+    body_axes['ankle_l'] = {"x": np.cross(y_axis, z_ankle), "y": y_axis, "z": z_ankle}
     rot_fem_l = osim.Rotation(
         create_osim_rot(body_axes['femur_l']['x'], body_axes['femur_l']['y'], body_axes['femur_l']['z'], inverse=False))
     rot_l = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis, inverse=False))
@@ -873,6 +877,10 @@ def create_tibfib_bodies_and_knee_joints(
         "y": y_axis,
         "z": z_axis
     }
+    z_ankle = r_LMAL - r_MMAL
+    z_ankle = z_ankle - z_ankle.dot(y_axis) * y_axis
+    z_ankle = z_ankle / np.linalg.norm(z_ankle)
+    body_axes['ankle_r'] = {"x": np.cross(y_axis, z_ankle), "y": y_axis, "z": z_ankle}
     rot_fem_r = osim.Rotation(
         create_osim_rot(body_axes['femur_r']['x'], body_axes['femur_r']['y'], body_axes['femur_r']['z'], inverse=False))
     rot_r = osim.Rotation(create_osim_rot(x_axis, y_axis, z_axis, inverse=False))
@@ -1138,11 +1146,11 @@ def repurpose_feet_bodies_and_create_joints(empty_model, left_tibfib, right_tibf
         print(f"Joint '{joint_name_to_remove}' not found in the model.")
 
     rot_tib_l = osim.Rotation(
-        create_osim_rot(body_axes['tibfib_l']['x'], body_axes['tibfib_l']['y'], body_axes['tibfib_l']['z'],
+        create_osim_rot(body_axes['ankle_l']['x'], body_axes['ankle_l']['y'], body_axes['ankle_l']['z'],
                         inverse=False))
 
     rot_tib_r = osim.Rotation(
-        create_osim_rot(body_axes['tibfib_r']['x'], body_axes['tibfib_r']['y'], body_axes['tibfib_r']['z'],
+        create_osim_rot(body_axes['ankle_r']['x'], body_axes['ankle_r']['y'], body_axes['ankle_r']['z'],
                         inverse=False))
 
     # Define the ankle joint connecting the left talus to the left tibfib
