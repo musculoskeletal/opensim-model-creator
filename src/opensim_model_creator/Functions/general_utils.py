@@ -217,7 +217,7 @@ def scale_landmark_files(mesh_directory, landmark_files, scale_factor=0.001):
 
 
 def scale_landmarks(landmark_file, scale_factor=0.001):
-    data = np.loadtxt(landmark_file, dtype=str)
+    data = np.loadtxt(landmark_file, dtype=str).astype(object)
     data[:, 1:] = (data[:, 1:].astype(float) * scale_factor).astype(str)
     np.savetxt(landmark_file, data, fmt='%s')
 
